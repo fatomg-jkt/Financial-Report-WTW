@@ -1,0 +1,1 @@
+{"name":"financial-report-wtw","version":"0.1.0","private":true,"type":"module","scripts":{"accurate:info":"node src/cli/accurate-info.js","test":"node --test"},"engines":{"node":">=18"}}
