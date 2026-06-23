@@ -1,4 +1,8 @@
-import { AccurateClient } from '../accurate/client.js';
+import { loadLocalEnv } from '../config/load-local-env.js';
+
+loadLocalEnv();
+
+const { AccurateClient } = await import('../accurate/client.js');
 
 try {
   const client = new AccurateClient();

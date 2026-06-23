@@ -30,3 +30,49 @@ test('requests API token info with only token and signature secret', async () =>
   assert.equal(calls[0].url, 'https://account.accurate.id/api/api-token.do');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer token');
 });
+
+async function withEnv(env, callback) {
+  const original = { ...process.env };
+  process.env = { ...original, ...env };
+  try {
+    return await callback();
+  } finally {
+    process.env = original;
+  }
+}
+
+test('CLI client reads credentials from runtime environment', async () => {
+  await withEnv({ ACCURATE_API_TOKEN: 'runtime-token', ACCURATE_SIGNATURE_SECRET: 'runtime-secret' }, async () => {
+    const client = new AccurateClient({
+      fetchImpl: async () => new Response(JSON.stringify({ s: true }), { status: 200 }),
+    });
+
+    assert.equal(client.apiToken, 'runtime-token');
+    assert.equal(client.signatureSecret, 'runtime-secret');
+  });
+});
+
+test('loads local .env without overriding runtime environment variables', async (t) => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { loadLocalEnv } = await import('../src/config/load-local-env.js');
+  const cwd = await mkdtemp(join(tmpdir(), 'accurate-env-'));
+  t.after(() => rm(cwd, { recursive: true, force: true }));
+
+  await writeFile(join(cwd, '.env'), [
+    'ACCURATE_API_TOKEN=local-token',
+    'ACCURATE_SIGNATURE_SECRET=local-secret',
+    'ACCURATE_BASE_URL=https://example.test # comment',
+  ].join('\n'));
+
+  await withEnv({ ACCURATE_API_TOKEN: 'runtime-token' }, async () => {
+    delete process.env.ACCURATE_SIGNATURE_SECRET;
+    delete process.env.ACCURATE_BASE_URL;
+
+    assert.equal(loadLocalEnv({ cwd }), true);
+    assert.equal(process.env.ACCURATE_API_TOKEN, 'runtime-token');
+    assert.equal(process.env.ACCURATE_SIGNATURE_SECRET, 'local-secret');
+    assert.equal(process.env.ACCURATE_BASE_URL, 'https://example.test');
+  });
+});
